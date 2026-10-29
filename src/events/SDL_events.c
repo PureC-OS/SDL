@@ -905,8 +905,15 @@ void SDL_FlushEvents(Uint32 minType, Uint32 maxType)
 }
 
 /* Run the system dependent event loops */
+#ifdef SDL_AUDIO_DRIVER_PUREC
+extern void PUREC_PumpAudio(void);
+#endif
+
 static void SDL_PumpEventsInternal(SDL_bool push_sentinel)
 {
+#ifdef SDL_AUDIO_DRIVER_PUREC
+    PUREC_PumpAudio();
+#endif
     SDL_VideoDevice *_this = SDL_GetVideoDevice();
 
     /* Release any keys held down from last frame */

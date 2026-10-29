@@ -197,6 +197,7 @@ extern AudioBootStrap WINMM_bootstrap;
 extern AudioBootStrap PAUDIO_bootstrap;
 extern AudioBootStrap HAIKUAUDIO_bootstrap;
 extern AudioBootStrap COREAUDIO_bootstrap;
+extern AudioBootStrap PUREC_AUDIO_bootstrap;
 extern AudioBootStrap DISKAUDIO_bootstrap;
 extern AudioBootStrap DUMMYAUDIO_bootstrap;
 extern AudioBootStrap FUSIONSOUND_bootstrap;

@@ -25,6 +25,8 @@
 #include "SDL_timer.h"
 #include "libc/include/purec.h"
 
+extern void PUREC_PumpAudio(void);
+
 static SDL_bool ticks_started = SDL_FALSE;
 static Uint64 start_ms;
 
@@ -71,7 +73,17 @@ Uint64 SDL_GetPerformanceFrequency(void)
 
 void SDL_Delay(Uint32 ms)
 {
-    pc_sleep(ms);
+    Uint64 end = uptime_ms() + ms;
+    for (;;) {
+        Uint64 now = uptime_ms();
+        Uint64 left;
+        if (now >= end) {
+            break;
+        }
+        PUREC_PumpAudio();
+        left = end - now;
+        pc_sleep(left > 8 ? 8 : (Uint32)left);
+    }
 }
 
 #endif /* SDL_TIMER_PUREC */
