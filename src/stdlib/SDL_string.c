@@ -236,14 +236,16 @@ static size_t SDL_ScanUnsignedLongLong(const char *text, int count, int radix, U
 {
     const unsigned long long ullong_max = ~0ULL;
     SDL_bool negative;
-    size_t len = SDL_ScanUnsignedLongLongInternal(text, count, radix, valuep, &negative);
+    unsigned long long value = 0;
+    size_t len = SDL_ScanUnsignedLongLongInternal(text, count, radix, &value, &negative);
     if (negative) {
-        if (*valuep == 0) {
-            *valuep = ullong_max;
+        if (value == 0) {
+            value = ullong_max;
         } else {
-            *valuep = 0ULL - *valuep;
+            value = 0ULL - value;
         }
     }
+    *valuep = value;
     return len;
 }
 #endif
@@ -923,7 +925,7 @@ Sint64 SDL_strtoll(const char *string, char **endp, int base)
 #if defined(HAVE_STRTOLL)
     return strtoll(string, endp, base);
 #else
-    long long value = 0;
+    Sint64 value = 0;
     size_t len = SDL_ScanLongLong(string, 0, base, &value);
     if (endp) {
         *endp = (char *)string + len;
@@ -937,7 +939,7 @@ Uint64 SDL_strtoull(const char *string, char **endp, int base)
 #if defined(HAVE_STRTOULL)
     return strtoull(string, endp, base);
 #else
-    unsigned long long value = 0;
+    Uint64 value = 0;
     size_t len = SDL_ScanUnsignedLongLong(string, 0, base, &value);
     if (endp) {
         *endp = (char *)string + len;
