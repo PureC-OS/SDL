@@ -27,6 +27,7 @@
  */
 
 #include "SDL_thread.h"
+#include "SDL_timer.h"
 
 #include "../generic/SDL_syscond_c.h"
 
@@ -42,6 +43,45 @@
 #define SDL_CondWait_generic        SDL_CondWait
 #define SDL_CondWaitTimeout_generic SDL_CondWaitTimeout
 #endif
+
+#ifdef SDL_THREADS_DISABLED
+
+
+SDL_cond *SDL_CreateCond(void)
+{
+    return (SDL_cond *)SDL_malloc(1);
+}
+
+void SDL_DestroyCond(SDL_cond *cond)
+{
+    SDL_free(cond);
+}
+
+int SDL_CondSignal(SDL_cond *cond)
+{
+    return cond ? 0 : SDL_InvalidParamError("cond");
+}
+
+int SDL_CondBroadcast(SDL_cond *cond)
+{
+    return cond ? 0 : SDL_InvalidParamError("cond");
+}
+
+int SDL_CondWaitTimeout(SDL_cond *cond, SDL_mutex *mutex, Uint32 ms)
+{
+    if (!cond) {
+        return SDL_InvalidParamError("cond");
+    }
+    SDL_Delay(1);
+    return ms == SDL_MUTEX_MAXWAIT ? 0 : SDL_MUTEX_TIMEDOUT;
+}
+
+int SDL_CondWait(SDL_cond *cond, SDL_mutex *mutex)
+{
+    return SDL_CondWaitTimeout(cond, mutex, SDL_MUTEX_MAXWAIT);
+}
+
+#else /* !SDL_THREADS_DISABLED */
 
 typedef struct SDL_cond_generic
 {
@@ -229,5 +269,7 @@ int SDL_CondWait_generic(SDL_cond *cond, SDL_mutex *mutex)
 {
     return SDL_CondWaitTimeout_generic(cond, mutex, SDL_MUTEX_MAXWAIT);
 }
+
+#endif /* SDL_THREADS_DISABLED */
 
 /* vi: set ts=4 sw=4 expandtab: */

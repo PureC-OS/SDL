@@ -32,6 +32,7 @@
 #include "SDL_purecaudio.h"
 
 #include "libaudio/include/pureaudio.h"
+#include "libc/include/purec.h"
 
 #define PUREC_AUDIO_RATE 22050
 #define PUREC_RING_BYTES 65536
@@ -41,6 +42,18 @@ static Uint8 purec_ring[PUREC_RING_BYTES];
 static size_t purec_ring_head;
 static size_t purec_ring_tail;
 static size_t purec_ring_count;
+static SDL_bool purec_silent;
+static Uint64 purec_silent_start_ms;
+static Uint64 purec_silent_frames;
+
+static Uint64 purec_uptime_ms(void)
+{
+    struct time_info info;
+    if (pc_time_get(&info) != 0) {
+        return 0;
+    }
+    return info.uptime_ms;
+}
 
 static void ring_put(const Uint8 *data, size_t length)
 {
@@ -105,8 +118,23 @@ static void PUREC_Fill(Sint16 *frames, Uint32 count, void *user)
 
 void PUREC_PumpAudio(void)
 {
-    if (purec_device && pa_stream_is_open()) {
+    if (!purec_device) {
+        return;
+    }
+    if (pa_stream_is_open()) {
         pa_stream_pump();
+    } else if (purec_silent) {
+        Sint16 sink[1024];
+        Uint64 due = (purec_uptime_ms() - purec_silent_start_ms) * PUREC_AUDIO_RATE / 1000;
+        if (due > purec_silent_frames + PUREC_AUDIO_RATE) {
+            purec_silent_frames = due - PUREC_AUDIO_RATE / 4;
+        }
+        while (purec_silent_frames < due) {
+            Uint64 left = due - purec_silent_frames;
+            Uint32 count = left > 1024 ? 1024 : (Uint32)left;
+            PUREC_Fill(sink, count, purec_device);
+            purec_silent_frames += count;
+        }
     }
 }
 
@@ -122,8 +150,11 @@ static int PUREC_OpenDevice(_THIS, const char *devname)
     SDL_CalculateAudioSpec(&_this->spec);
 
     purec_ring_head = purec_ring_tail = purec_ring_count = 0;
+    purec_silent = SDL_FALSE;
     if (pa_stream_open((pa_stream_fill_fn)PUREC_Fill, _this) != 0) {
-        return SDL_SetError("PureAudio cannot open a PCM stream");
+        purec_silent = SDL_TRUE;
+        purec_silent_start_ms = purec_uptime_ms();
+        purec_silent_frames = 0;
     }
     purec_device = _this;
     _this->hidden = (void *)0x1;
@@ -135,6 +166,7 @@ static void PUREC_CloseDevice(_THIS)
     if (purec_device == _this) {
         pa_stream_close();
         purec_device = NULL;
+        purec_silent = SDL_FALSE;
     }
 }
 
@@ -153,11 +185,6 @@ static Uint8 *PUREC_GetDeviceBuf(_THIS)
 
 static SDL_bool PUREC_Init(SDL_AudioDriverImpl *impl)
 {
-    struct pa_status status;
-    if (pa_get_status(&status) != 0 || !status.pcm_ready) {
-        return SDL_FALSE;
-    }
-
     impl->OpenDevice = PUREC_OpenDevice;
     impl->CloseDevice = PUREC_CloseDevice;
     impl->WaitDevice = PUREC_WaitDevice;

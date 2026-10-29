@@ -158,12 +158,14 @@ static int PUREC_CreateWindow(_THIS, SDL_Window *window)
     if (!pc_display_get_info(&display) || !display.available) {
         return SDL_SetError("No display available");
     }
-    if (window->flags & SDL_WINDOW_FULLSCREEN) {
+    if (window->w > (int)display.width - PUREC_FRAME_WIDTH) {
         window->w = (int)display.width - PUREC_FRAME_WIDTH;
-        window->h = (int)display.height - PUREC_FRAME_HEIGHT;
-        frame_w = display.width;
-        frame_h = display.height;
     }
+    if (window->h > (int)display.height - PUREC_FRAME_HEIGHT) {
+        window->h = (int)display.height - PUREC_FRAME_HEIGHT;
+    }
+    frame_w = (uint32_t)window->w + PUREC_FRAME_WIDTH;
+    frame_h = (uint32_t)window->h + PUREC_FRAME_HEIGHT;
 
     data = (SDL_WindowData *)SDL_calloc(1, sizeof(*data));
     if (!data) {
