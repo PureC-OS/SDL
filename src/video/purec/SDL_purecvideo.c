@@ -63,11 +63,23 @@ static void PUREC_DeleteDevice(SDL_VideoDevice *device)
     SDL_free(device);
 }
 
+static SDL_bool PUREC_IsScaled(const SDL_WindowData *data, const SDL_Surface *surface)
+{
+    return (data->window.client.width != (uint32_t)surface->w ||
+            data->window.client.height != (uint32_t)surface->h) ? SDL_TRUE : SDL_FALSE;
+}
+
 static void PUREC_Present(SDL_Window *window)
 {
     SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
     SDL_Surface *surface = (SDL_Surface *)SDL_GetWindowData(window, PUREC_SURFACE);
     if (!data || !surface) {
+        return;
+    }
+    if (PUREC_IsScaled(data, surface)) {
+        pg_window_blit_scaled(&data->window, (const uint32_t *)surface->pixels,
+                              (uint32_t)surface->w, (uint32_t)surface->h,
+                              (uint32_t)(surface->pitch / 4));
         return;
     }
     pg_window_blit(&data->window, 0, 0, (uint32_t)surface->w, (uint32_t)surface->h,
@@ -112,6 +124,10 @@ static int PUREC_UpdateWindowFramebuffer(_THIS, SDL_Window *window, const SDL_Re
 
     if (!data || !surface) {
         return SDL_SetError("Couldn't find PureC surface for window");
+    }
+    if (PUREC_IsScaled(data, surface)) {
+        PUREC_Present(window);
+        return 0;
     }
     for (i = 0; i < numrects; ++i) {
         SDL_Rect r = rects[i];
@@ -245,7 +261,21 @@ static void PUREC_PumpEvents(_THIS)
     for (budget = PUREC_MAX_EVENTS; budget > 0 && pg_window_poll_event(&data->window, &ev); --budget) {
         int x = ev.x - (int)data->window.client.x;
         int y = ev.y - (int)data->window.client.y;
+        SDL_Surface *surface = (SDL_Surface *)SDL_GetWindowData(window, PUREC_SURFACE);
         SDL_bool inside = (x >= 0 && y >= 0 && x < window->w && y < window->h) ? SDL_TRUE : SDL_FALSE;
+
+        if (surface && PUREC_IsScaled(data, surface)) {
+            int32_t source_x = 0;
+            int32_t source_y = 0;
+            inside = (x >= 0 && y >= 0 &&
+                      x < (int)data->window.client.width &&
+                      y < (int)data->window.client.height) ? SDL_TRUE : SDL_FALSE;
+            if (pg_window_scaled_point(&data->window, (uint32_t)surface->w, (uint32_t)surface->h,
+                                       ev.x, ev.y, &source_x, &source_y)) {
+                x = source_x;
+                y = source_y;
+            }
+        }
 
         switch (ev.type) {
         case PG_EVENT_CLOSE:
